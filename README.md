@@ -1,0 +1,2 @@
+# CharacteristicAIProject
+かわいいAIアシスタントを作ろう

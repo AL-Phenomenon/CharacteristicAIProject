@@ -3,8 +3,9 @@
 """
 
 import os
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Literal
 import anthropic
+from openai import OpenAI
 from ..memory.rag_system import RAGMemorySystem
 from ..character.character import Character
 from ..character.prompt_builder import PromptBuilder, ConversationMessage
@@ -15,9 +16,11 @@ class ChatBot:
     
     def __init__(
         self,
-        api_key: str,
         character: Character,
         memory_system: RAGMemorySystem,
+        llm_provider: Literal["anthropic", "openai"] = "anthropic",
+        api_key: Optional[str] = None,
+        base_url: Optional[str] = None,
         model_name: str = "claude-sonnet-4-20250514",
         max_tokens: int = 1000,
         short_term_memory_size: int = 5,
@@ -25,15 +28,17 @@ class ChatBot:
     ):
         """
         Args:
-            api_key: Anthropic APIキー
             character: キャラクター設定
             memory_system: RAGメモリーシステム
+            llm_provider: LLMプロバイダー ("anthropic" or "openai")
+            api_key: APIキー
+            base_url: ベースURL (OpenAI互換APIの場合)
             model_name: 使用するモデル名
             max_tokens: 最大トークン数
             short_term_memory_size: 短期記憶のサイズ
             max_memory_results: RAG検索で取得する記憶数
         """
-        self.client = anthropic.Anthropic(api_key=api_key)
+        self.llm_provider = llm_provider
         self.character = character
         self.memory = memory_system
         self.model_name = model_name
@@ -41,10 +46,21 @@ class ChatBot:
         self.short_term_memory_size = short_term_memory_size
         self.max_memory_results = max_memory_results
         
+        # LLMクライアントの初期化
+        if llm_provider == "anthropic":
+            self.client = anthropic.Anthropic(api_key=api_key)
+        elif llm_provider == "openai":
+            self.client = OpenAI(
+                api_key=api_key or "not-needed",  # LM StudioではダミーでもOK
+                base_url=base_url or "http://localhost:1234/v1"
+            )
+        else:
+            raise ValueError(f"Unknown LLM provider: {llm_provider}")
+        
         # ユーザーごとの短期記憶（セッション内のみ）
         self.conversation_history: Dict[str, List[ConversationMessage]] = {}
         
-        print(f"チャットボット初期化完了: {character.name}")
+        print(f"チャットボット初期化完了: {character.name} (Provider: {llm_provider})")
     
     def chat(self, user_id: str, message: str) -> str:
         """
@@ -86,15 +102,30 @@ class ChatBot:
     def _generate_response(self, context: str) -> str:
         """LLM APIで応答を生成"""
         try:
-            response = self.client.messages.create(
-                model=self.model_name,
-                max_tokens=self.max_tokens,
-                system=self.character.get_system_prompt(),
-                messages=[
-                    {"role": "user", "content": context}
-                ]
-            )
-            return response.content[0].text
+            if self.llm_provider == "anthropic":
+                # Anthropic Claude API
+                response = self.client.messages.create(
+                    model=self.model_name,
+                    max_tokens=self.max_tokens,
+                    system=self.character.get_system_prompt(),
+                    messages=[
+                        {"role": "user", "content": context}
+                    ]
+                )
+                return response.content[0].text
+            
+            elif self.llm_provider == "openai":
+                # OpenAI互換API (LM Studio等)
+                response = self.client.chat.completions.create(
+                    model=self.model_name,
+                    max_tokens=self.max_tokens,
+                    messages=[
+                        {"role": "system", "content": self.character.get_system_prompt()},
+                        {"role": "user", "content": context}
+                    ],
+                    temperature=0.7,  # 創造性のバランス
+                )
+                return response.choices[0].message.content
         
         except Exception as e:
             print(f"API呼び出しエラー: {e}")

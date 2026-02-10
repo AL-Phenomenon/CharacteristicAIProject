@@ -22,16 +22,33 @@ def load_environment():
     """環境変数をロード"""
     load_dotenv()
     
-    # 必須の環境変数チェック
-    api_key = os.getenv("ANTHROPIC_API_KEY")
-    if not api_key:
-        print("エラー: ANTHROPIC_API_KEY環境変数が設定されていません")
-        print("\n.envファイルを作成し、以下を設定してください:")
-        print("ANTHROPIC_API_KEY=your_api_key_here")
+    # LLMプロバイダーの選択
+    llm_provider = os.getenv("LLM_PROVIDER", "anthropic").lower()
+    
+    # プロバイダーに応じたAPIキーチェック
+    if llm_provider == "anthropic":
+        api_key = os.getenv("ANTHROPIC_API_KEY")
+        if not api_key:
+            print("エラー: ANTHROPIC_API_KEY環境変数が設定されていません")
+            print("\n.envファイルを作成し、以下を設定してください:")
+            print("ANTHROPIC_API_KEY=your_api_key_here")
+            sys.exit(1)
+        base_url = None
+    
+    elif llm_provider == "openai":
+        api_key = os.getenv("OPENAI_API_KEY", "not-needed")
+        base_url = os.getenv("OPENAI_BASE_URL", "http://localhost:1234/v1")
+        print(f"OpenAI互換API使用: {base_url}")
+    
+    else:
+        print(f"エラー: 未知のLLMプロバイダー: {llm_provider}")
+        print("LLM_PROVIDERは 'anthropic' または 'openai' を指定してください")
         sys.exit(1)
     
     return {
+        "llm_provider": llm_provider,
         "api_key": api_key,
+        "base_url": base_url,
         "model_name": os.getenv("MODEL_NAME", "claude-sonnet-4-20250514"),
         "max_tokens": int(os.getenv("MAX_TOKENS", "1000")),
         "chroma_db_path": os.getenv("CHROMA_DB_PATH", "./data/chroma_db"),
@@ -72,9 +89,11 @@ def initialize_system(config: dict):
     # 3. チャットボットの初期化
     print("\n[3/3] チャットボットを初期化中...")
     chatbot = ChatBot(
-        api_key=config["api_key"],
         character=character,
         memory_system=memory_system,
+        llm_provider=config["llm_provider"],
+        api_key=config["api_key"],
+        base_url=config.get("base_url"),
         model_name=config["model_name"],
         max_tokens=config["max_tokens"],
         short_term_memory_size=config["short_term_memory_size"],

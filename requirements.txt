@@ -7,7 +7,7 @@ pydantic>=2.5.0
 
 # LLM Providers (使用するものだけインストール)
 # Claude API使用時:
-# anthropic>=0.18.0
+anthropic>=0.18.0
 
 # LM Studio / OpenAI互換API使用時:
 openai>=1.12.0

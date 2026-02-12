@@ -1,7 +1,6 @@
 # CharacteristicAIProject
 かわいいAIアシスタントを作ろう
 
- Neuro Chat AI
 
 RAG（検索拡張生成）記憶システムを備えた、キャラクター性のあるAIチャットボット
 
@@ -69,8 +68,3 @@ neuro-chat-ai/
 
 - \`exit\` / \`quit\`: チャット終了
 - \`clear\`: 短期記憶をクリア（長期記憶は保持）
-
-## ライセンス
-
-MIT
-"""

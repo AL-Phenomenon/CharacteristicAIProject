@@ -75,7 +75,7 @@ def initialize_system(config: dict):
     
     # 2. キャラクターのロード
     print("\n[2/3] キャラクター設定を読み込み中...")
-    character_config_path = project_root / "config" / "character_config.json"
+    character_config_path = project_root / "config" / "config.json"
     
     if character_config_path.exists():
         character = Character.from_file(str(character_config_path))

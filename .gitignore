@@ -1,4 +1,4 @@
-"""
+
 # Python
 __pycache__/
 *.py[cod]
@@ -69,5 +69,3 @@ models/
 tmp/
 temp/
 *.tmp
-
-"""

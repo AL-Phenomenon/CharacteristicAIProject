@@ -80,13 +80,23 @@ class Character:
         """キャラクター名"""
         return self.config.name
     
-    def get_system_prompt(self) -> str:
+    def get_system_prompt(self, compact: bool = False) -> str:
         """
         システムプロンプトを生成
+        
+        Args:
+            compact: Trueの場合、簡潔版を生成（トークン数削減）
         
         Returns:
             システムプロンプト文字列
         """
+        if compact:
+            return self._get_compact_system_prompt()
+        else:
+            return self._get_full_system_prompt()
+    
+    def _get_full_system_prompt(self) -> str:
+        """詳細版システムプロンプト（デフォルト）"""
         speech_style_text = self._format_speech_style()
         behavior_rules_text = self._format_behavior_rules()
         
@@ -108,6 +118,42 @@ class Character:
 
 この設定に基づいて、一貫したキャラクターとして振る舞ってください。
 ユーザーとの過去の会話記憶が提供される場合は、それを考慮して応答してください。"""
+        
+        return prompt
+    
+    def _get_compact_system_prompt(self) -> str:
+        """簡潔版システムプロンプト（トークン数削減）"""
+        prompt = f"""あなたは{self.config.name}（{self.config.gender}、{self.config.age}）です。
+
+性格: {self.config.personality}
+
+話し方:"""
+        
+        # 一人称
+        if self.config.speech_style.first_person:
+            prompt += f" 一人称「{self.config.speech_style.first_person[0]}」。"
+        
+        # 語尾（最大2つ）
+        if self.config.speech_style.sentence_endings:
+            endings = self.config.speech_style.sentence_endings[:2]
+            prompt += f" 語尾「{'/'.join(endings)}」。"
+        
+        # 特徴的な表現（最大2つ）
+        if self.config.speech_style.common_phrases:
+            phrases = self.config.speech_style.common_phrases[:2]
+            prompt += f" よく「{phrases[0]}」と言う。"
+        
+        # 背景（100文字まで）
+        background = self.config.background[:100] + "..." if len(self.config.background) > 100 else self.config.background
+        prompt += f"\n\n{background}"
+        
+        # 行動指針（最大3つ）
+        if self.config.behavior_rules:
+            prompt += "\n\n行動:"
+            for rule in self.config.behavior_rules[:3]:
+                # 各ルールも短縮
+                short_rule = rule[:50] + "..." if len(rule) > 50 else rule
+                prompt += f" {short_rule}。"
         
         return prompt
     

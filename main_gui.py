@@ -1,6 +1,6 @@
 """
-Neuro Chat AI - メインエントリーポイント
-RAG記憶システムを備えたキャラクター性のあるAIチャットボット
+Chat AI - GUIモード エントリーポイント
+ウィンドウでチャットできるGUIインターフェース
 """
 
 import os
@@ -15,7 +15,7 @@ sys.path.insert(0, str(project_root))
 from src.memory.rag_system import RAGMemorySystem
 from src.character.character import Character
 from src.bot.chatbot import ChatBot
-from src.bot.cli_interface import run_cli
+from src.bot.gui_interface import run_gui
 
 
 def load_environment():
@@ -63,7 +63,7 @@ def load_environment():
 def initialize_system(config: dict):
     """システムを初期化"""
     print("=" * 60)
-    print("  [HAL] Chat AI - 初期化中...")
+    print(" Chat AI HAL - 初期化中（GUIモード）...")
     print("=" * 60)
     
     # 1. 記憶システムの初期化
@@ -76,7 +76,7 @@ def initialize_system(config: dict):
     
     # 2. キャラクターのロード
     print("\n[2/3] キャラクター設定を読み込み中...")
-    character_config_path = project_root / "config" / "config.json"
+    character_config_path = project_root / "config" / "character_config.json"
     
     if character_config_path.exists():
         character = Character.from_file(str(character_config_path))
@@ -105,6 +105,8 @@ def initialize_system(config: dict):
     prompt_mode = "簡潔版" if config["compact_prompt"] else "詳細版"
     print(f"✓ システムプロンプト: {prompt_mode}")
     print("\n✓ 初期化完了！")
+    print("GUIウィンドウを起動します...\n")
+    
     return chatbot
 
 
@@ -117,9 +119,9 @@ def main():
         # システムの初期化
         chatbot = initialize_system(config)
         
-        # CLIインターフェースの起動
-        print("\n" + "=" * 60)
-        run_cli(chatbot)
+        # GUIインターフェースの起動
+        print("=" * 60)
+        run_gui(chatbot)
         
     except KeyboardInterrupt:
         print("\n\nプログラムを終了します。")

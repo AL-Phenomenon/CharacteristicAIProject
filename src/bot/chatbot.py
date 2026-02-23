@@ -3,9 +3,7 @@
 """
 
 import os
-from typing import Dict, List, Optional, Literal
-import anthropic
-from openai import OpenAI
+from typing import Dict, List, Optional, Literal, Any
 from ..memory.rag_system import RAGMemorySystem
 from ..character.character import Character
 from ..character.prompt_builder import PromptBuilder, ConversationMessage
@@ -24,7 +22,8 @@ class ChatBot:
         model_name: str = "claude-sonnet-4-20250514",
         max_tokens: int = 1000,
         short_term_memory_size: int = 5,
-        max_memory_results: int = 5
+        max_memory_results: int = 5,
+        compact_prompt: bool = True
     ):
         """
         Args:
@@ -37,6 +36,7 @@ class ChatBot:
             max_tokens: 最大トークン数
             short_term_memory_size: 短期記憶のサイズ
             max_memory_results: RAG検索で取得する記憶数
+            compact_prompt: システムプロンプトを簡潔化するか
         """
         self.llm_provider = llm_provider
         self.character = character
@@ -45,15 +45,32 @@ class ChatBot:
         self.max_tokens = max_tokens
         self.short_term_memory_size = short_term_memory_size
         self.max_memory_results = max_memory_results
+        self.compact_prompt = compact_prompt
         
         # LLMクライアントの初期化
         if llm_provider == "anthropic":
-            self.client = anthropic.Anthropic(api_key=api_key)
+            try:
+                import anthropic
+                self.client = anthropic.Anthropic(api_key=api_key)
+            except ImportError:
+                raise ImportError(
+                    "anthropicライブラリがインストールされていません。\n"
+                    "以下のコマンドでインストールしてください:\n"
+                    "pip install anthropic"
+                )
         elif llm_provider == "openai":
-            self.client = OpenAI(
-                api_key=api_key or "not-needed",  # LM StudioではダミーでもOK
-                base_url=base_url or "http://localhost:1234/v1"
-            )
+            try:
+                from openai import OpenAI
+                self.client = OpenAI(
+                    api_key=api_key or "not-needed",  # LM StudioではダミーでもOK
+                    base_url=base_url or "http://localhost:1234/v1"
+                )
+            except ImportError:
+                raise ImportError(
+                    "openaiライブラリがインストールされていません。\n"
+                    "以下のコマンドでインストールしてください:\n"
+                    "pip install openai"
+                )
         else:
             raise ValueError(f"Unknown LLM provider: {llm_provider}")
         
@@ -102,12 +119,15 @@ class ChatBot:
     def _generate_response(self, context: str) -> str:
         """LLM APIで応答を生成"""
         try:
+            # システムプロンプトを取得（compact設定に応じて）
+            system_prompt = self.character.get_system_prompt(compact=self.compact_prompt)
+            
             if self.llm_provider == "anthropic":
                 # Anthropic Claude API
                 response = self.client.messages.create(
                     model=self.model_name,
                     max_tokens=self.max_tokens,
-                    system=self.character.get_system_prompt(),
+                    system=system_prompt,
                     messages=[
                         {"role": "user", "content": context}
                     ]
@@ -120,7 +140,7 @@ class ChatBot:
                     model=self.model_name,
                     max_tokens=self.max_tokens,
                     messages=[
-                        {"role": "system", "content": self.character.get_system_prompt()},
+                        {"role": "system", "content": system_prompt},
                         {"role": "user", "content": context}
                     ],
                     temperature=0.7,  # 創造性のバランス

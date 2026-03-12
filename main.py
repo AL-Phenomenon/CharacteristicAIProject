@@ -16,6 +16,7 @@ from src.memory.rag_system import RAGMemorySystem
 from src.character.character import Character
 from src.bot.chatbot import ChatBot
 from src.bot.cli_interface import run_cli
+from src.bot.gui_interface import run_gui
 
 
 def load_environment():
@@ -45,6 +46,9 @@ def load_environment():
         print("LLM_PROVIDERは 'anthropic' または 'openai' を指定してください")
         sys.exit(1)
     
+    # インターフェースモードの取得
+    interface_mode = os.getenv("INTERFACE_MODE", "cli").lower()
+    
     return {
         "llm_provider": llm_provider,
         "api_key": api_key,
@@ -52,6 +56,7 @@ def load_environment():
         "model_name": os.getenv("MODEL_NAME", "claude-sonnet-4-20250514"),
         "max_tokens": int(os.getenv("MAX_TOKENS", "1000")),
         "compact_prompt": os.getenv("COMPACT_PROMPT", "true").lower() == "true",
+        "interface_mode": interface_mode,
         "chroma_db_path": os.getenv("CHROMA_DB_PATH", "./data/chroma_db"),
         "collection_name": os.getenv("COLLECTION_NAME", "chat_memory"),
         "embedding_model": os.getenv("EMBEDDING_MODEL", "intfloat/multilingual-e5-base"),
@@ -62,8 +67,10 @@ def load_environment():
 
 def initialize_system(config: dict):
     """システムを初期化"""
+    interface_name = "GUIモード" if config["interface_mode"] == "gui" else "CLIモード"
+    
     print("=" * 60)
-    print("  [HAL] Chat AI - 初期化中...")
+    print(f"  HARKA Chat AI - 初期化中（{interface_name}）...")
     print("=" * 60)
     
     # 1. 記憶システムの初期化
@@ -104,7 +111,13 @@ def initialize_system(config: dict):
     
     prompt_mode = "簡潔版" if config["compact_prompt"] else "詳細版"
     print(f"✓ システムプロンプト: {prompt_mode}")
-    print("\n✓ 初期化完了！")
+    
+    if config["interface_mode"] == "gui":
+        print("\n✓ 初期化完了！")
+        print("GUIウィンドウを起動します...\n")
+    else:
+        print("\n✓ 初期化完了！")
+    
     return chatbot
 
 
@@ -117,9 +130,17 @@ def main():
         # システムの初期化
         chatbot = initialize_system(config)
         
-        # CLIインターフェースの起動
-        print("\n" + "=" * 60)
-        run_cli(chatbot)
+        # インターフェースの起動
+        print("=" * 60)
+        
+        if config["interface_mode"] == "gui":
+            run_gui(chatbot)
+        elif config["interface_mode"] == "cli":
+            run_cli(chatbot)
+        else:
+            print(f"エラー: 未知のインターフェースモード: {config['interface_mode']}")
+            print("INTERFACE_MODEは 'cli' または 'gui' を指定してください")
+            sys.exit(1)
         
     except KeyboardInterrupt:
         print("\n\nプログラムを終了します。")

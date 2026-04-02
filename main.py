@@ -17,6 +17,7 @@ from src.character.character import Character
 from src.bot.chatbot import ChatBot
 from src.bot.cli_interface import run_cli
 from src.bot.gui_interface import run_gui
+from src.bot.discord_bot import run_discord_bot
 
 
 def load_environment():
@@ -49,6 +50,18 @@ def load_environment():
     # インターフェースモードの取得
     interface_mode = os.getenv("INTERFACE_MODE", "cli").lower()
     
+    # Discord設定の取得（discordモードの場合）
+    discord_token = None
+    discord_status = None
+    if interface_mode == "discord":
+        discord_token = os.getenv("DISCORD_BOT_TOKEN")
+        if not discord_token:
+            print("エラー: DISCORD_BOT_TOKEN環境変数が設定されていません")
+            print("\n.envファイルに以下を設定してください:")
+            print("DISCORD_BOT_TOKEN=your_discord_bot_token_here")
+            sys.exit(1)
+        discord_status = os.getenv("DISCORD_STATUS_MESSAGE", "HARKAと会話中")
+    
     return {
         "llm_provider": llm_provider,
         "api_key": api_key,
@@ -57,6 +70,8 @@ def load_environment():
         "max_tokens": int(os.getenv("MAX_TOKENS", "1000")),
         "compact_prompt": os.getenv("COMPACT_PROMPT", "true").lower() == "true",
         "interface_mode": interface_mode,
+        "discord_token": discord_token,
+        "discord_status": discord_status,
         "chroma_db_path": os.getenv("CHROMA_DB_PATH", "./data/chroma_db"),
         "collection_name": os.getenv("COLLECTION_NAME", "chat_memory"),
         "embedding_model": os.getenv("EMBEDDING_MODEL", "intfloat/multilingual-e5-base"),
@@ -67,10 +82,14 @@ def load_environment():
 
 def initialize_system(config: dict):
     """システムを初期化"""
-    interface_name = "GUIモード" if config["interface_mode"] == "gui" else "CLIモード"
+    interface_name = {
+        "gui": "GUIモード",
+        "cli": "CLIモード",
+        "discord": "Discord Botモード"
+    }.get(config["interface_mode"], "不明なモード")
     
     print("=" * 60)
-    print(f"  HARKA Chat AI - 初期化中（{interface_name}）...")
+    print(f"  HARKA - 初期化中（{interface_name}）...")
     print("=" * 60)
     
     # 1. 記憶システムの初期化
@@ -137,9 +156,15 @@ def main():
             run_gui(chatbot)
         elif config["interface_mode"] == "cli":
             run_cli(chatbot)
+        elif config["interface_mode"] == "discord":
+            run_discord_bot(
+                chatbot,
+                token=config["discord_token"],
+                status_message=config["discord_status"]
+            )
         else:
             print(f"エラー: 未知のインターフェースモード: {config['interface_mode']}")
-            print("INTERFACE_MODEは 'cli' または 'gui' を指定してください")
+            print("INTERFACE_MODEは 'cli', 'gui', または 'discord' を指定してください")
             sys.exit(1)
         
     except KeyboardInterrupt:

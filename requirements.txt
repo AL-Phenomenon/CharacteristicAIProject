@@ -7,12 +7,14 @@ pydantic>=2.5.0
 
 # LLM Providers (使用するものだけインストール)
 # Claude API使用時:
-anthropic>=0.18.0
+# anthropic>=0.18.0
 
 # LM Studio / OpenAI互換API使用時:
-openai>=1.12.0
+# openai>=1.12.0
+
+# Discord Bot
+discord.py>=2.3.0
 
 # Optional Dependencies for Future Extensions
-# discord.py>=2.3.0  # Discord Bot化
 # fastapi>=0.109.0   # Web API
 # uvicorn>=0.27.0    # Web Server

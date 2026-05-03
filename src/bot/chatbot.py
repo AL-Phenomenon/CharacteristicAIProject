@@ -132,7 +132,7 @@ class ChatBot:
                         {"role": "user", "content": context}
                     ]
                 )
-                return response.content[0].text
+                raw_response = response.content[0].text
             
             elif self.llm_provider == "openai":
                 # OpenAI互換API (LM Studio等)
@@ -145,11 +145,39 @@ class ChatBot:
                     ],
                     temperature=0.7,  # 創造性のバランス
                 )
-                return response.choices[0].message.content
+                raw_response = response.choices[0].message.content
+            
+            # <think>タグとその内容を削除
+            cleaned_response = self._remove_think_tags(raw_response)
+            
+            return cleaned_response
         
         except Exception as e:
             print(f"API呼び出しエラー: {e}")
             return f"申し訳ありません、応答の生成中にエラーが発生しました: {str(e)}"
+    
+    def _remove_think_tags(self, text: str) -> str:
+        """
+        応答から<think>タグとその内容を削除
+        
+        Args:
+            text: 元のテキスト
+        
+        Returns:
+            <think>タグを削除したテキスト
+        """
+        import re
+        
+        # <think>...</think>を削除（改行を含む場合も対応）
+        cleaned = re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL)
+        
+        # 前後の空白や改行を整理
+        cleaned = cleaned.strip()
+        
+        # 複数の連続する改行を1つにまとめる
+        cleaned = re.sub(r'\n\s*\n+', '\n\n', cleaned)
+        
+        return cleaned
     
     def _get_short_term_history(self, user_id: str) -> List[ConversationMessage]:
         """短期記憶を取得"""

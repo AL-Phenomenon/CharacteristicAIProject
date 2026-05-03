@@ -58,7 +58,7 @@ def load_environment():
         if not discord_token:
             print("エラー: DISCORD_BOT_TOKEN環境変数が設定されていません")
             print("\n.envファイルに以下を設定してください:")
-            print("DISCORD_BOT_TOKEN=your_discord_bot_token_here")
+            print("DISCORD_BOT_TOKEN=")
             sys.exit(1)
         discord_status = os.getenv("DISCORD_STATUS_MESSAGE", "HARKAと会話中")
     
@@ -66,7 +66,7 @@ def load_environment():
         "llm_provider": llm_provider,
         "api_key": api_key,
         "base_url": base_url,
-        "model_name": os.getenv("MODEL_NAME", "claude-sonnet-4-20250514"),
+        "model_name": os.getenv("MODEL_NAME", "claude"),
         "max_tokens": int(os.getenv("MAX_TOKENS", "1000")),
         "compact_prompt": os.getenv("COMPACT_PROMPT", "true").lower() == "true",
         "interface_mode": interface_mode,

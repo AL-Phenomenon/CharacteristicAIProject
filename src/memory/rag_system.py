@@ -220,3 +220,83 @@ class RAGMemorySystem:
             "unique_users": len(user_counts),
             "user_counts": user_counts
         }
+    
+    # ========================================
+    # PDF コレクション検索（既存データに影響なし）
+    # ========================================
+    
+    PDF_COLLECTION_PREFIX = "pdf_"
+    
+    def get_pdf_collection_names(self) -> List[str]:
+        """pdf_ プレフィックス付きのコレクション名を一覧取得"""
+        collections = self.client.list_collections()
+        return [
+            c.name for c in collections
+            if c.name.startswith(self.PDF_COLLECTION_PREFIX)
+        ]
+    
+    def search_pdf_collections(
+        self,
+        query: str,
+        n_results: int = 3,
+        min_relevance: float = 0.0
+    ) -> List[Memory]:
+        """
+        全てのPDFコレクションを横断検索
+        
+        Args:
+            query: 検索クエリ
+            n_results: 各コレクションから取得する最大件数
+            min_relevance: 最小関連度スコア（0-1）
+        
+        Returns:
+            関連するPDFチャンクのリスト（Memoryオブジェクト）
+        """
+        pdf_collections = self.get_pdf_collection_names()
+        
+        if not pdf_collections:
+            return []
+        
+        # クエリのエンベディング生成
+        query_embedding = self.embedding_model.encode(query).tolist()
+        
+        all_results = []
+        
+        for col_name in pdf_collections:
+            try:
+                collection = self.client.get_collection(col_name)
+                
+                # コレクションが空の場合スキップ
+                if collection.count() == 0:
+                    continue
+                
+                results = collection.query(
+                    query_embeddings=[query_embedding],
+                    n_results=min(n_results, collection.count())
+                )
+                
+                if results['documents'][0]:
+                    for doc, meta, distance in zip(
+                        results['documents'][0],
+                        results['metadatas'][0],
+                        results['distances'][0]
+                    ):
+                        relevance = 1 - distance
+                        
+                        if relevance >= min_relevance:
+                            # PDFソースであることを明示するメタデータを追加
+                            meta['source_type'] = 'pdf'
+                            meta['collection_name'] = col_name
+                            
+                            all_results.append(Memory(
+                                content=doc,
+                                metadata=meta,
+                                relevance=relevance
+                            ))
+            except Exception as e:
+                print(f"PDF検索エラー（{col_name}）: {e}")
+                continue
+        
+        # 関連度でソートして上位を返す
+        all_results.sort(key=lambda m: m.relevance, reverse=True)
+        return all_results[:n_results]

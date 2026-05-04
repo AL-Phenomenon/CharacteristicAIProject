@@ -25,8 +25,9 @@ class PromptBuilder:
     @staticmethod
     def build_context_from_memories(
         memories: List[Memory],
-        short_term_history: List[ConversationMessage],
-        current_message: str
+        short_term_history: List['ConversationMessage'],
+        current_message: str,
+        pdf_memories: List[Memory] = None
     ) -> str:
         """
         記憶と会話履歴からコンテキストを構築
@@ -35,11 +36,26 @@ class PromptBuilder:
             memories: RAGから取得した長期記憶
             short_term_history: セッション内の短期記憶
             current_message: 現在のユーザーメッセージ
+            pdf_memories: PDF資料から検索された関連情報
         
         Returns:
             構築されたコンテキスト文字列
         """
         context_parts = []
+        
+        # PDF参考資料（存在する場合）
+        if pdf_memories:
+            context_parts.append("## 関連する参考資料（PDF）:")
+            for i, memory in enumerate(pdf_memories, 1):
+                source_file = memory.metadata.get('source_file', '不明')
+                page_num = memory.metadata.get('page_number', '?')
+                relevance_indicator = "★" * int(memory.relevance * 3)
+                
+                context_parts.append(
+                    f"{i}. [{source_file} p.{page_num}] {relevance_indicator}"
+                )
+                context_parts.append(f"   {memory.content}")
+            context_parts.append("")  # 空行
         
         # 長期記憶（RAG）
         if memories:
@@ -63,7 +79,7 @@ class PromptBuilder:
             context_parts.append("")  # 空行
         
         # どちらもない場合
-        if not memories and not short_term_history:
+        if not memories and not short_term_history and not pdf_memories:
             context_parts.append("（初めての会話です）")
             context_parts.append("")
         

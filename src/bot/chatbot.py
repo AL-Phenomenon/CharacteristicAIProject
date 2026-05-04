@@ -97,20 +97,27 @@ class ChatBot:
             n_results=self.max_memory_results
         )
         
-        # 2. 短期記憶を取得
+        # 2. PDF資料から関連情報を検索
+        pdf_memories = self.memory.search_pdf_collections(
+            query=message,
+            n_results=3
+        )
+        
+        # 3. 短期記憶を取得
         short_term_history = self._get_short_term_history(user_id)
         
-        # 3. プロンプト構築
+        # 4. プロンプト構築
         context = PromptBuilder.build_context_from_memories(
             memories=long_term_memories,
             short_term_history=short_term_history,
-            current_message=message
+            current_message=message,
+            pdf_memories=pdf_memories
         )
         
-        # 4. LLM APIで応答生成
+        # 5. LLM APIで応答生成
         response = self._generate_response(context)
         
-        # 5. 記憶に保存（短期・長期両方）
+        # 6. 記憶に保存（短期・長期両方）
         self._save_to_memory(user_id, message, "user")
         self._save_to_memory(user_id, response, "assistant")
         

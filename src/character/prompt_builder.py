@@ -50,9 +50,21 @@ class PromptBuilder:
                 source_file = memory.metadata.get('source_file', '不明')
                 page_num = memory.metadata.get('page_number', '?')
                 relevance_indicator = "★" * int(memory.relevance * 3)
-                
+
+                # 日付情報を構築
+                date_parts = []
+                creation_date = memory.metadata.get('creation_date', '')
+                mod_date = memory.metadata.get('mod_date', '')
+                pdf_title = memory.metadata.get('pdf_title', '')
+                if creation_date:
+                    date_parts.append(f"作成: {creation_date}")
+                if mod_date:
+                    date_parts.append(f"更新: {mod_date}")
+                date_str = f" ({', '.join(date_parts)})" if date_parts else ""
+                title_str = f" 「{pdf_title}」" if pdf_title else ""
+
                 context_parts.append(
-                    f"{i}. [{source_file} p.{page_num}] {relevance_indicator}"
+                    f"{i}. [{source_file} p.{page_num}]{title_str}{date_str} {relevance_indicator}"
                 )
                 context_parts.append(f"   {memory.content}")
             context_parts.append("")  # 空行

@@ -6,11 +6,12 @@ FastAPI + 静的ファイルによるLAN公開用チャットUI
 import os
 import socket
 import asyncio
+import uuid
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Dict, Any
 from datetime import datetime
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, BackgroundTasks, HTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel
@@ -26,6 +27,17 @@ class ChatResponse(BaseModel):
     response: str
     timestamp: str
     character_name: str
+
+class TaskSubmitResponse(BaseModel):
+    task_id: str
+    status: str
+
+class TaskStatusResponse(BaseModel):
+    task_id: str
+    status: str
+    response: Optional[str] = None
+    timestamp: Optional[str] = None
+    character_name: Optional[str] = None
 
 class ClearRequest(BaseModel):
     user_id: str = "web_user"
@@ -50,32 +62,79 @@ def create_app(chatbot: ChatBot) -> FastAPI:
     static_dir = Path(__file__).parent.parent.parent / "static"
 
     # --- API エンドポイント ---
+    
+    # 進行中のタスクを保持する辞書
+    tasks: Dict[str, Any] = {}
 
-    @app.post("/api/chat", response_model=ChatResponse)
-    async def chat(request: ChatRequest):
-        """メッセージを送信し、AI応答を返す"""
-        # ChatBotはsync関数なので、スレッドプールで実行して
-        # 他のリクエストをブロックしないようにする
+    async def generate_response_task(task_id: str, user_id: str, message: str):
+        """バックグラウンドでLLMに応答を生成させるタスク"""
         loop = asyncio.get_event_loop()
-        response = await loop.run_in_executor(
-            None,
-            chatbot.chat,
+        try:
+            response = await loop.run_in_executor(
+                None,
+                chatbot.chat,
+                user_id,
+                message
+            )
+            
+            if not response:
+                print(f"[WARNING] 空の応答が返されました (user={user_id})")
+                response = "（応答を生成できませんでした。もう一度お試しください。）"
+            else:
+                print(f"[CHAT] 応答生成完了: {len(response)}文字 (user={user_id}, task={task_id})")
+                
+            tasks[task_id] = {
+                "status": "completed",
+                "response": response,
+                "timestamp": datetime.now().isoformat(),
+                "character_name": chatbot.character.name
+            }
+        except Exception as e:
+            print(f"[ERROR] 応答生成エラー: {e}")
+            tasks[task_id] = {
+                "status": "error",
+                "response": f"（エラーが発生しました: {str(e)}）",
+                "timestamp": datetime.now().isoformat(),
+                "character_name": chatbot.character.name
+            }
+
+    @app.post("/api/chat", response_model=TaskSubmitResponse)
+    async def chat(request: ChatRequest, background_tasks: BackgroundTasks):
+        """メッセージを受け付け、タスクIDを返す"""
+        task_id = str(uuid.uuid4())
+        tasks[task_id] = {"status": "processing"}
+        
+        # バックグラウンドタスクとして生成を開始
+        background_tasks.add_task(
+            generate_response_task,
+            task_id,
             request.user_id,
             request.message
         )
+        
+        return TaskSubmitResponse(task_id=task_id, status="processing")
 
-        # Noneや空文字列の場合のフォールバック
-        if not response:
-            print(f"[WARNING] 空の応答が返されました (user={request.user_id})")
-            response = "（応答を生成できませんでした。もう一度お試しください。）"
+    @app.get("/api/chat/status/{task_id}", response_model=TaskStatusResponse)
+    async def chat_status(task_id: str):
+        """タスクのステータスと、完了していれば結果を返す"""
+        if task_id not in tasks:
+            raise HTTPException(status_code=404, detail="Task not found")
+            
+        task_data = tasks[task_id]
+        
+        if task_data["status"] == "processing":
+            return TaskStatusResponse(task_id=task_id, status="processing")
         else:
-            print(f"[CHAT] 応答生成完了: {len(response)}文字 (user={request.user_id})")
-
-        return ChatResponse(
-            response=response,
-            timestamp=datetime.now().isoformat(),
-            character_name=chatbot.character.name
-        )
+            # 完了（またはエラー）の場合は結果を返す
+            # 一度返したらメモリから消す（または一定時間後に消すロジックでもよいが、ここでは取得時に削除する）
+            response_data = tasks.pop(task_id)
+            return TaskStatusResponse(
+                task_id=task_id,
+                status=response_data["status"],
+                response=response_data["response"],
+                timestamp=response_data["timestamp"],
+                character_name=response_data["character_name"]
+            )
 
     @app.post("/api/clear")
     async def clear_memory(request: ClearRequest):

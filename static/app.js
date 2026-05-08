@@ -83,6 +83,7 @@
 
     async function sendMessage(message) {
         try {
+            // 1. タスクを送信してIDを取得
             const res = await fetch('/api/chat', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -93,10 +94,30 @@
             });
 
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
-
-            const data = await res.json();
-            showConnectionOk();
-            return data;
+            const submitData = await res.json();
+            const taskId = submitData.task_id;
+            
+            // 2. 結果が出るまで数秒おきにポーリング
+            while (true) {
+                // 3秒待つ
+                await new Promise(resolve => setTimeout(resolve, 3000));
+                
+                try {
+                    const statusRes = await fetch(`/api/chat/status/${taskId}`);
+                    if (!statusRes.ok) continue; // エラーでもリトライ
+                    
+                    const statusData = await statusRes.json();
+                    
+                    if (statusData.status === 'completed' || statusData.status === 'error') {
+                        showConnectionOk();
+                        return statusData; // responseが含まれている
+                    }
+                    // processingの場合はループ継続
+                } catch (e) {
+                    // ネットワーク切れなどのエラーでも無視してリトライし続ける
+                    console.warn("Polling network error, retrying...", e);
+                }
+            }
         } catch (err) {
             console.error('Chat API error:', err);
             showConnectionError();

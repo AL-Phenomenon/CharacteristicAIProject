@@ -3,6 +3,7 @@
 """
 
 import os
+import threading
 from typing import Dict, List, Optional, Literal, Any
 from ..memory.rag_system import RAGMemorySystem
 from ..character.character import Character
@@ -23,7 +24,10 @@ class ChatBot:
         max_tokens: int = 1000,
         short_term_memory_size: int = 5,
         max_memory_results: int = 5,
-        compact_prompt: bool = True
+        max_pdf_results: int = 2,
+        pdf_min_relevance: float = 0.3,
+        compact_prompt: bool = True,
+        disable_thinking: bool = False
     ):
         """
         Args:
@@ -36,7 +40,10 @@ class ChatBot:
             max_tokens: 最大トークン数
             short_term_memory_size: 短期記憶のサイズ
             max_memory_results: RAG検索で取得する記憶数
+            max_pdf_results: PDF検索で取得する最大件数
+            pdf_min_relevance: PDF検索の最小関連度閾値
             compact_prompt: システムプロンプトを簡潔化するか
+            disable_thinking: Qwen3等のthinkingモードを無効化するか
         """
         self.llm_provider = llm_provider
         self.character = character
@@ -45,7 +52,10 @@ class ChatBot:
         self.max_tokens = max_tokens
         self.short_term_memory_size = short_term_memory_size
         self.max_memory_results = max_memory_results
+        self.max_pdf_results = max_pdf_results
+        self.pdf_min_relevance = pdf_min_relevance
         self.compact_prompt = compact_prompt
+        self.disable_thinking = disable_thinking
         
         # LLMクライアントの初期化
         if llm_provider == "anthropic":
@@ -90,17 +100,23 @@ class ChatBot:
         Returns:
             AIの応答
         """
+        # ★案3: エンベディングを1回だけ計算して使い回す
+        query_embedding = self.memory.encode_query(message)
+        
         # 1. RAGで関連する長期記憶を取得
         long_term_memories = self.memory.search_memories(
             query=message,
             user_id=user_id,
-            n_results=self.max_memory_results
+            n_results=self.max_memory_results,
+            query_embedding=query_embedding
         )
         
-        # 2. PDF資料から関連情報を検索
+        # 2. PDF資料から関連情報を検索（★案5: 関連度閾値でフィルタリング）
         pdf_memories = self.memory.search_pdf_collections(
             query=message,
-            n_results=3
+            n_results=self.max_pdf_results,
+            min_relevance=self.pdf_min_relevance,
+            query_embedding=query_embedding
         )
         
         # 3. 短期記憶を取得
@@ -117,9 +133,14 @@ class ChatBot:
         # 5. LLM APIで応答生成
         response = self._generate_response(context)
         
-        # 6. 記憶に保存（短期・長期両方）
-        self._save_to_memory(user_id, message, "user")
-        self._save_to_memory(user_id, response, "assistant")
+        # 6. ★案4: 記憶保存をバックグラウンドで実行（応答を先に返す）
+        self._save_to_short_term(user_id, message, "user")
+        self._save_to_short_term(user_id, response, "assistant")
+        threading.Thread(
+            target=self._save_to_long_term_memory,
+            args=(user_id, message, response),
+            daemon=True
+        ).start()
         
         return response
     
@@ -128,6 +149,10 @@ class ChatBot:
         try:
             # システムプロンプトを取得（compact設定に応じて）
             system_prompt = self.character.get_system_prompt(compact=self.compact_prompt)
+            
+            # Qwen3等のthinkingモード無効化（DISABLE_THINKING=trueの場合）
+            if self.disable_thinking:
+                system_prompt = system_prompt + "\n/no_think"
             
             if self.llm_provider == "anthropic":
                 # Anthropic Claude API
@@ -142,7 +167,7 @@ class ChatBot:
                 raw_response = response.content[0].text
             
             elif self.llm_provider == "openai":
-                # OpenAI互換API (LM Studio等)
+                # OpenAI互換API (LM Studio/Ollama等)
                 response = self.client.chat.completions.create(
                     model=self.model_name,
                     max_tokens=self.max_tokens,
@@ -175,14 +200,23 @@ class ChatBot:
         """
         import re
         
+        if not text:
+            return text
+        
         # <think>...</think>を削除（改行を含む場合も対応）
         cleaned = re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL)
+        
+        # 閉じタグなしの<think>（トークン制限で切れた場合）も削除
+        cleaned = re.sub(r'<think>.*$', '', cleaned, flags=re.DOTALL)
         
         # 前後の空白や改行を整理
         cleaned = cleaned.strip()
         
         # 複数の連続する改行を1つにまとめる
         cleaned = re.sub(r'\n\s*\n+', '\n\n', cleaned)
+        
+        if not cleaned and text:
+            print(f"[WARNING] thinkタグ除去後に応答が空になりました。元の長さ: {len(text)}文字")
         
         return cleaned
     
@@ -194,25 +228,33 @@ class ChatBot:
         # 最新のN件のみ返す
         return self.conversation_history[user_id][-self.short_term_memory_size:]
     
-    def _save_to_memory(self, user_id: str, message: str, role: str):
-        """記憶に保存（短期・長期両方）"""
+    def _save_to_short_term(self, user_id: str, message: str, role: str):
+        """短期記憶に保存（インメモリ、即完了）"""
         from datetime import datetime
         timestamp = datetime.now().isoformat()
         
-        # 短期記憶に追加
         if user_id not in self.conversation_history:
             self.conversation_history[user_id] = []
         
         self.conversation_history[user_id].append(
             ConversationMessage(role=role, content=message, timestamp=timestamp)
         )
-        
-        # 長期記憶（RAG）に追加
-        self.memory.add_memory(
-            user_id=user_id,
-            message=message,
-            role=role
-        )
+    
+    def _save_to_long_term_memory(self, user_id: str, user_message: str, ai_response: str):
+        """長期記憶（RAG）にバックグラウンドで保存"""
+        try:
+            self.memory.add_memory(
+                user_id=user_id,
+                message=user_message,
+                role="user"
+            )
+            self.memory.add_memory(
+                user_id=user_id,
+                message=ai_response,
+                role="assistant"
+            )
+        except Exception as e:
+            print(f"[WARNING] 長期記憶の保存に失敗: {e}")
     
     def clear_short_term_memory(self, user_id: str):
         """短期記憶をクリア（長期記憶は残る）"""

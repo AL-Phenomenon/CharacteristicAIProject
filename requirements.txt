@@ -16,6 +16,6 @@ pydantic>=2.5.0
 # Discord Bot
 discord.py>=2.3.0
 
-# Optional Dependencies for Future Extensions
-# fastapi>=0.109.0   # Web API
-# uvicorn>=0.27.0    # Web Server
+# Web Interface (LAN公開)
+fastapi>=0.109.0
+uvicorn>=0.27.0

@@ -61,6 +61,10 @@ class RAGMemorySystem:
         
         print(f"記憶システム初期化完了: {self.collection.count()}件の記憶")
     
+    def encode_query(self, text: str) -> list:
+        """テキストのエンベディングを計算（結果を使い回し可能）"""
+        return self.embedding_model.encode(text).tolist()
+    
     def add_memory(
         self,
         user_id: str,
@@ -112,7 +116,8 @@ class RAGMemorySystem:
         query: str,
         user_id: str,
         n_results: int = 5,
-        min_relevance: float = 0.0
+        min_relevance: float = 0.0,
+        query_embedding: list = None
     ) -> List[Memory]:
         """
         関連する記憶を検索
@@ -122,12 +127,14 @@ class RAGMemorySystem:
             user_id: ユーザーID
             n_results: 取得する記憶の最大数
             min_relevance: 最小関連度スコア（0-1）
+            query_embedding: 事前計算済みエンベディング（省略時は自動計算）
         
         Returns:
             関連する記憶のリスト
         """
-        # クエリのエンベディング生成
-        query_embedding = self.embedding_model.encode(query).tolist()
+        # エンベディング（事前計算済みがあればそれを使用）
+        if query_embedding is None:
+            query_embedding = self.encode_query(query)
         
         # 検索実行
         results = self.collection.query(
@@ -239,7 +246,8 @@ class RAGMemorySystem:
         self,
         query: str,
         n_results: int = 3,
-        min_relevance: float = 0.0
+        min_relevance: float = 0.0,
+        query_embedding: list = None
     ) -> List[Memory]:
         """
         全てのPDFコレクションを横断検索
@@ -248,6 +256,7 @@ class RAGMemorySystem:
             query: 検索クエリ
             n_results: 各コレクションから取得する最大件数
             min_relevance: 最小関連度スコア（0-1）
+            query_embedding: 事前計算済みエンベディング（省略時は自動計算）
         
         Returns:
             関連するPDFチャンクのリスト（Memoryオブジェクト）
@@ -257,8 +266,9 @@ class RAGMemorySystem:
         if not pdf_collections:
             return []
         
-        # クエリのエンベディング生成
-        query_embedding = self.embedding_model.encode(query).tolist()
+        # エンベディング（事前計算済みがあればそれを使用）
+        if query_embedding is None:
+            query_embedding = self.encode_query(query)
         
         all_results = []
         

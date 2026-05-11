@@ -280,9 +280,11 @@ class RAGMemorySystem:
                 if collection.count() == 0:
                     continue
                 
+                # n_results=0は「上限なし」＝コレクション全件を対象にする
+                fetch_count = collection.count() if n_results == 0 else min(n_results, collection.count())
                 results = collection.query(
                     query_embeddings=[query_embedding],
-                    n_results=min(n_results, collection.count())
+                    n_results=fetch_count
                 )
                 
                 if results['documents'][0]:
@@ -307,6 +309,6 @@ class RAGMemorySystem:
                 print(f"PDF検索エラー（{col_name}）: {e}")
                 continue
         
-        # 関連度でソートして上位を返す
+        # 関連度でソートして返す（n_results=0は上限なし）
         all_results.sort(key=lambda m: m.relevance, reverse=True)
-        return all_results[:n_results]
+        return all_results if n_results == 0 else all_results[:n_results]

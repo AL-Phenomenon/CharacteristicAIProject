@@ -80,6 +80,7 @@ def load_environment():
         "discord_status": discord_status,
         "web_host": web_host,
         "web_port": web_port,
+        "creator_password": os.getenv("CREATOR_PASSWORD", ""),
         "chroma_db_path": os.getenv("CHROMA_DB_PATH", "./data/chroma_db"),
         "collection_name": os.getenv("COLLECTION_NAME", "chat_memory"),
         "embedding_model": os.getenv("EMBEDDING_MODEL", "intfloat/multilingual-e5-base"),
@@ -180,7 +181,8 @@ def main():
             run_web(
                 chatbot,
                 host=config["web_host"],
-                port=config["web_port"]
+                port=config["web_port"],
+                creator_password=config["creator_password"]
             )
         else:
             print(f"エラー: 未知のインターフェースモード: {config['interface_mode']}")

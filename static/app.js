@@ -11,6 +11,8 @@
         characterInitial: 'A',
         userId: generateUserId(),
         isProcessing: false,
+        isCreator: false,
+        creatorName: '',
     };
 
     // --- DOM Elements ---
@@ -26,6 +28,14 @@
     const typingAvatar = $('#typing-avatar');
     const userIdDisplay = $('#user-id-display');
     const connectionBanner = $('#connection-banner');
+
+    const authBtn = $('#auth-btn');
+    const authModal = $('#auth-modal');
+    const authClose = $('#auth-modal-close');
+    const authCancel = $('#auth-cancel');
+    const authSubmit = $('#auth-submit');
+    const authPassword = $('#auth-password');
+    const authMessage = $('#auth-message');
 
     // --- Init ---
     async function init() {
@@ -53,6 +63,17 @@
         });
 
         clearBtn.addEventListener('click', handleClear);
+
+        // Auth Events
+        if (authBtn) {
+            authBtn.addEventListener('click', showAuthModal);
+            authClose.addEventListener('click', hideAuthModal);
+            authCancel.addEventListener('click', hideAuthModal);
+            authSubmit.addEventListener('click', handleAuth);
+            authPassword.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') handleAuth();
+            });
+        }
     }
 
     // --- API ---
@@ -74,6 +95,11 @@
             if (welcomeTitle) welcomeTitle.textContent = `${state.characterName} へようこそ`;
             if (welcomeIcon) welcomeIcon.textContent = state.characterInitial;
 
+            // Check if creator auth is enabled
+            if (data.has_creator_auth && authBtn) {
+                authBtn.style.display = 'inline-flex';
+            }
+
             showConnectionOk();
         } catch (err) {
             console.error('Character info fetch failed:', err);
@@ -89,7 +115,8 @@
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     message: message,
-                    user_id: state.userId
+                    user_id: state.userId,
+                    is_creator: state.isCreator
                 })
             });
 
@@ -137,6 +164,20 @@
         }
     }
 
+    async function authenticateCreator(password) {
+        try {
+            const res = await fetch('/api/auth', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ password })
+            });
+            return await res.json();
+        } catch (err) {
+            console.error('Auth API error:', err);
+            throw err;
+        }
+    }
+
     // --- Handlers ---
     async function handleSend() {
         if (state.isProcessing) return;
@@ -181,6 +222,57 @@
         // Clear chat display
         chatContainer.innerHTML = '';
         showWelcome();
+    }
+
+    function showAuthModal() {
+        if (state.isCreator) {
+            alert(`すでに制作者「${state.creatorName}」としてログインしています。`);
+            return;
+        }
+        authPassword.value = '';
+        authMessage.textContent = '';
+        authMessage.className = 'modal__message';
+        authModal.style.display = 'flex';
+        setTimeout(() => authPassword.focus(), 100);
+    }
+
+    function hideAuthModal() {
+        authModal.style.display = 'none';
+    }
+
+    async function handleAuth() {
+        const password = authPassword.value;
+        if (!password) return;
+
+        authSubmit.disabled = true;
+        authMessage.textContent = '認証中...';
+        authMessage.className = 'modal__message';
+
+        try {
+            const data = await authenticateCreator(password);
+            if (data.success) {
+                authMessage.textContent = data.message;
+                authMessage.className = 'modal__message success';
+                state.isCreator = true;
+                state.creatorName = data.creator_name;
+                
+                // Update UI
+                authBtn.innerHTML = '👑 <span>制作者</span>';
+                authBtn.classList.add('active');
+                authBtn.style.color = '#00b894';
+                authBtn.style.borderColor = '#00b894';
+
+                setTimeout(hideAuthModal, 1500);
+            } else {
+                authMessage.textContent = data.message;
+                authMessage.className = 'modal__message error';
+                authSubmit.disabled = false;
+            }
+        } catch (err) {
+            authMessage.textContent = 'エラーが発生しました';
+            authMessage.className = 'modal__message error';
+            authSubmit.disabled = false;
+        }
     }
 
     // --- UI Helpers ---

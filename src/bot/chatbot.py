@@ -89,7 +89,7 @@ class ChatBot:
         
         print(f"チャットボット初期化完了: {character.name} (Provider: {llm_provider})")
     
-    def chat(self, user_id: str, message: str) -> str:
+    def chat(self, user_id: str, message: str, is_creator: bool = False) -> str:
         """
         ユーザーとチャット
         
@@ -123,11 +123,14 @@ class ChatBot:
         short_term_history = self._get_short_term_history(user_id)
         
         # 4. プロンプト構築
+        creator_name = getattr(self.character.config, 'creator', None)
         context = PromptBuilder.build_context_from_memories(
             memories=long_term_memories,
             short_term_history=short_term_history,
             current_message=message,
-            pdf_memories=pdf_memories
+            pdf_memories=pdf_memories,
+            is_creator=is_creator,
+            creator_name=creator_name
         )
         
         # 5. LLM APIで応答生成
@@ -150,12 +153,8 @@ class ChatBot:
             # システムプロンプトを取得（compact設定に応じて）
             system_prompt = self.character.get_system_prompt(compact=self.compact_prompt)
             
-            # Qwen3等のthinkingモード無効化（DISABLE_THINKING=trueの場合）
-            if self.disable_thinking:
-                system_prompt = system_prompt + "\n/no_think"
-            
             if self.llm_provider == "anthropic":
-                # Anthropic Claude API
+                # Anthropic Claude API（thinkingはAPIオプションで制御）
                 response = self.client.messages.create(
                     model=self.model_name,
                     max_tokens=self.max_tokens,
@@ -168,6 +167,12 @@ class ChatBot:
             
             elif self.llm_provider == "openai":
                 # OpenAI互換API (LM Studio/Ollama等)
+                # DISABLE_THINKING=trueの場合、chat_template_kwargsでthinkingを無効化
+                # これは /no_think プロンプトよりもトークナイザーレベルで確実に動作する
+                extra_body = {}
+                if self.disable_thinking:
+                    extra_body["chat_template_kwargs"] = {"enable_thinking": False}
+                
                 response = self.client.chat.completions.create(
                     model=self.model_name,
                     max_tokens=self.max_tokens,
@@ -176,10 +181,11 @@ class ChatBot:
                         {"role": "user", "content": context}
                     ],
                     temperature=0.7,  # 創造性のバランス
+                    extra_body=extra_body if extra_body else None,
                 )
                 raw_response = response.choices[0].message.content
             
-            # <think>タグとその内容を削除
+            # <think>タグとその内容を削除（念のため残す）
             cleaned_response = self._remove_think_tags(raw_response)
             
             return cleaned_response

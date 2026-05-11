@@ -24,6 +24,7 @@ class CharacterConfig(BaseModel):
     speech_style: SpeechStyle
     background: str
     behavior_rules: List[str] = Field(default_factory=list)
+    creator: Optional[str] = None
 
 
 class Character:

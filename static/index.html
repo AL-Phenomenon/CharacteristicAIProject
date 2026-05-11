@@ -46,6 +46,9 @@
 
             <div class="header__actions">
                 <span class="user-id-display" id="user-id-display"></span>
+                <button class="header__btn header__btn--auth" id="auth-btn" title="制作者ログイン" style="display:none;">
+                    🔑 <span>ログイン</span>
+                </button>
                 <button class="header__btn" id="clear-btn" title="会話をリセット">
                     🗑 <span>リセット</span>
                 </button>
@@ -101,6 +104,25 @@
             <div class="input-area__hint">Enter で送信 ・ Shift+Enter で改行</div>
         </footer>
 
+    </div>
+
+    <!-- Auth Modal -->
+    <div class="modal-overlay" id="auth-modal" style="display:none;">
+        <div class="modal">
+            <div class="modal__header">
+                <h2 class="modal__title">🔐 制作者認証</h2>
+                <button class="modal__close" id="auth-modal-close">&times;</button>
+            </div>
+            <div class="modal__body">
+                <p class="modal__desc">パスワードを入力してください</p>
+                <input type="password" class="modal__input" id="auth-password" placeholder="パスワード" autocomplete="off">
+                <div class="modal__message" id="auth-message"></div>
+            </div>
+            <div class="modal__footer">
+                <button class="modal__btn modal__btn--cancel" id="auth-cancel">キャンセル</button>
+                <button class="modal__btn modal__btn--submit" id="auth-submit">認証</button>
+            </div>
+        </div>
     </div>
 
     <!-- Scripts -->

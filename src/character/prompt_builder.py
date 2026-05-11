@@ -27,7 +27,9 @@ class PromptBuilder:
         memories: List[Memory],
         short_term_history: List['ConversationMessage'],
         current_message: str,
-        pdf_memories: List[Memory] = None
+        pdf_memories: List[Memory] = None,
+        is_creator: bool = False,
+        creator_name: str = None
     ) -> str:
         """
         記憶と会話履歴からコンテキストを構築
@@ -37,11 +39,19 @@ class PromptBuilder:
             short_term_history: セッション内の短期記憶
             current_message: 現在のユーザーメッセージ
             pdf_memories: PDF資料から検索された関連情報
+            is_creator: 現在のユーザーが制作者かどうか
+            creator_name: 制作者の名前
         
         Returns:
             構築されたコンテキスト文字列
         """
         context_parts = []
+        
+        # 制作者情報（制作者としてログインしている場合）
+        if is_creator and creator_name:
+            context_parts.append(f"## 話し相手の情報:")
+            context_parts.append(f"今あなたに話しかけているのは、あなたの製作者「{creator_name}」です。")
+            context_parts.append("")
         
         # PDF参考資料（存在する場合）
         if pdf_memories:

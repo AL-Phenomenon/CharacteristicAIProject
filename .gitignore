@@ -40,6 +40,7 @@ venv.bak/
 # Environment Variables
 .env
 .env.local
+.env.example
 
 # Data
 data/

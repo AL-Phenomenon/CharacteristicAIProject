@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="description" content="AIチャットボット - LAN内ネットワーク公開">
+    <title>AI Chat</title>
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+JP:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Styles -->
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+    <!-- Background Effects -->
+    <div class="bg-effects" aria-hidden="true">
+        <div class="bg-orb bg-orb--1"></div>
+        <div class="bg-orb bg-orb--2"></div>
+        <div class="bg-orb bg-orb--3"></div>
+    </div>
+
+    <!-- App -->
+    <div class="app">
+
+        <!-- Connection Banner -->
+        <div class="connection-banner" id="connection-banner">
+            ⚠ サーバーとの接続に問題があります
+        </div>
+
+        <!-- Header -->
+        <header class="header">
+            <div class="header__info">
+                <div class="header__avatar" id="header-avatar">A</div>
+                <div>
+                    <div class="header__name" id="header-name">AI</div>
+                    <div class="header__status">
+                        <span class="header__status-dot"></span>
+                        オンライン
+                    </div>
+                </div>
+            </div>
+
+            <div class="header__actions">
+                <span class="user-id-display" id="user-id-display"></span>
+                <button class="header__btn header__btn--auth" id="auth-btn" title="制作者ログイン" style="display:none;">
+                    🔑 <span>ログイン</span>
+                </button>
+                <button class="header__btn" id="clear-btn" title="会話をリセット">
+                    🗑 <span>リセット</span>
+                </button>
+            </div>
+        </header>
+
+        <!-- Chat Area -->
+        <main class="chat-area" id="chat-area">
+            <div class="chat-container" id="chat-container">
+
+                <!-- Welcome -->
+                <div class="welcome" id="welcome">
+                    <div class="welcome__icon" id="welcome-icon">A</div>
+                    <h1 class="welcome__title" id="welcome-title">AI へようこそ</h1>
+                    <p class="welcome__subtitle">
+                        メッセージを送って会話を始めましょう。<br>
+                        記憶システムにより、あなたとの会話を覚えています。
+                    </p>
+                </div>
+
+            </div>
+
+            <!-- Typing Indicator -->
+            <div class="typing-indicator" id="typing-indicator">
+                <div class="typing-indicator__avatar" id="typing-avatar">A</div>
+                <div class="typing-indicator__bubble">
+                    <span class="typing-dot"></span>
+                    <span class="typing-dot"></span>
+                    <span class="typing-dot"></span>
+                </div>
+            </div>
+        </main>
+
+        <!-- Input Area -->
+        <footer class="input-area">
+            <div class="input-area__container">
+                <div class="input-area__wrapper">
+                    <textarea
+                        class="input-area__textarea"
+                        id="message-input"
+                        placeholder="メッセージを入力..."
+                        rows="1"
+                        autofocus
+                    ></textarea>
+                </div>
+                <button class="input-area__send" id="send-btn" title="送信">
+                    <svg class="send-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="22" y1="2" x2="11" y2="13"></line>
+                        <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                    </svg>
+                </button>
+            </div>
+            <div class="input-area__hint">Enter で送信 ・ Shift+Enter で改行</div>
+        </footer>
+
+    </div>
+
+    <!-- Auth Modal -->
+    <div class="modal-overlay" id="auth-modal" style="display:none;">
+        <div class="modal">
+            <div class="modal__header">
+                <h2 class="modal__title">🔐 制作者認証</h2>
+                <button class="modal__close" id="auth-modal-close">&times;</button>
+            </div>
+            <div class="modal__body">
+                <p class="modal__desc">パスワードを入力してください</p>
+                <input type="password" class="modal__input" id="auth-password" placeholder="パスワード" autocomplete="off">
+                <div class="modal__message" id="auth-message"></div>
+            </div>
+            <div class="modal__footer">
+                <button class="modal__btn modal__btn--cancel" id="auth-cancel">キャンセル</button>
+                <button class="modal__btn modal__btn--submit" id="auth-submit">認証</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="/static/app.js"></script>
+</body>
+</html>

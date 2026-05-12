@@ -25,8 +25,11 @@ class PromptBuilder:
     @staticmethod
     def build_context_from_memories(
         memories: List[Memory],
-        short_term_history: List[ConversationMessage],
-        current_message: str
+        short_term_history: List['ConversationMessage'],
+        current_message: str,
+        pdf_memories: List[Memory] = None,
+        is_creator: bool = False,
+        creator_name: str = None
     ) -> str:
         """
         記憶と会話履歴からコンテキストを構築
@@ -35,11 +38,46 @@ class PromptBuilder:
             memories: RAGから取得した長期記憶
             short_term_history: セッション内の短期記憶
             current_message: 現在のユーザーメッセージ
+            pdf_memories: PDF資料から検索された関連情報
+            is_creator: 現在のユーザーが制作者かどうか
+            creator_name: 制作者の名前
         
         Returns:
             構築されたコンテキスト文字列
         """
         context_parts = []
+        
+        # 制作者情報（制作者としてログインしている場合）
+        if is_creator and creator_name:
+            context_parts.append(f"## 話し相手の情報:")
+            context_parts.append(f"今あなたに話しかけているのは、あなたの製作者「{creator_name}」です。")
+            context_parts.append("")
+        
+        # PDF参考資料（存在する場合）
+        if pdf_memories:
+            context_parts.append("## 関連する参考資料（PDF）:")
+            for i, memory in enumerate(pdf_memories, 1):
+                source_file = memory.metadata.get('source_file', '不明')
+                page_num = memory.metadata.get('page_number', '?')
+                relevance_indicator = "★" * int(memory.relevance * 3)
+
+                # 日付情報を構築
+                date_parts = []
+                creation_date = memory.metadata.get('creation_date', '')
+                mod_date = memory.metadata.get('mod_date', '')
+                pdf_title = memory.metadata.get('pdf_title', '')
+                if creation_date:
+                    date_parts.append(f"作成: {creation_date}")
+                if mod_date:
+                    date_parts.append(f"更新: {mod_date}")
+                date_str = f" ({', '.join(date_parts)})" if date_parts else ""
+                title_str = f" 「{pdf_title}」" if pdf_title else ""
+
+                context_parts.append(
+                    f"{i}. [{source_file} p.{page_num}]{title_str}{date_str} {relevance_indicator}"
+                )
+                context_parts.append(f"   {memory.content}")
+            context_parts.append("")  # 空行
         
         # 長期記憶（RAG）
         if memories:
@@ -63,7 +101,7 @@ class PromptBuilder:
             context_parts.append("")  # 空行
         
         # どちらもない場合
-        if not memories and not short_term_history:
+        if not memories and not short_term_history and not pdf_memories:
             context_parts.append("（初めての会話です）")
             context_parts.append("")
         

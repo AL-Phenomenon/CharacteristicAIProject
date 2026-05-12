@@ -18,6 +18,7 @@ from src.bot.chatbot import ChatBot
 from src.bot.cli_interface import run_cli
 from src.bot.gui_interface import run_gui
 from src.bot.discord_bot import run_discord_bot
+from src.bot.web_interface import run_web
 
 
 def load_environment():
@@ -50,6 +51,10 @@ def load_environment():
     # インターフェースモードの取得
     interface_mode = os.getenv("INTERFACE_MODE", "cli").lower()
     
+    # Web設定の取得
+    web_host = os.getenv("WEB_HOST", "0.0.0.0")
+    web_port = int(os.getenv("WEB_PORT", "8080"))
+    
     # Discord設定の取得（discordモードの場合）
     discord_token = None
     discord_status = None
@@ -69,14 +74,20 @@ def load_environment():
         "model_name": os.getenv("MODEL_NAME", "claude"),
         "max_tokens": int(os.getenv("MAX_TOKENS", "1000")),
         "compact_prompt": os.getenv("COMPACT_PROMPT", "true").lower() == "true",
+        "disable_thinking": os.getenv("DISABLE_THINKING", "false").lower() == "true",
         "interface_mode": interface_mode,
         "discord_token": discord_token,
         "discord_status": discord_status,
+        "web_host": web_host,
+        "web_port": web_port,
+        "creator_password": os.getenv("CREATOR_PASSWORD", ""),
         "chroma_db_path": os.getenv("CHROMA_DB_PATH", "./data/chroma_db"),
         "collection_name": os.getenv("COLLECTION_NAME", "chat_memory"),
         "embedding_model": os.getenv("EMBEDDING_MODEL", "intfloat/multilingual-e5-base"),
         "max_memory_results": int(os.getenv("MAX_MEMORY_RESULTS", "5")),
         "short_term_memory_size": int(os.getenv("SHORT_TERM_MEMORY_SIZE", "5")),
+        "max_pdf_results": int(os.getenv("MAX_PDF_RESULTS", "2")),
+        "pdf_min_relevance": float(os.getenv("PDF_MIN_RELEVANCE", "0.3")),
     }
 
 
@@ -85,7 +96,8 @@ def initialize_system(config: dict):
     interface_name = {
         "gui": "GUIモード",
         "cli": "CLIモード",
-        "discord": "Discord Botモード"
+        "discord": "Discord Botモード",
+        "web": "Webサーバーモード"
     }.get(config["interface_mode"], "不明なモード")
     
     print("=" * 60)
@@ -125,7 +137,10 @@ def initialize_system(config: dict):
         max_tokens=config["max_tokens"],
         short_term_memory_size=config["short_term_memory_size"],
         max_memory_results=config["max_memory_results"],
-        compact_prompt=config["compact_prompt"]
+        max_pdf_results=config["max_pdf_results"],
+        pdf_min_relevance=config["pdf_min_relevance"],
+        compact_prompt=config["compact_prompt"],
+        disable_thinking=config["disable_thinking"]
     )
     
     prompt_mode = "簡潔版" if config["compact_prompt"] else "詳細版"
@@ -162,9 +177,16 @@ def main():
                 token=config["discord_token"],
                 status_message=config["discord_status"]
             )
+        elif config["interface_mode"] == "web":
+            run_web(
+                chatbot,
+                host=config["web_host"],
+                port=config["web_port"],
+                creator_password=config["creator_password"]
+            )
         else:
             print(f"エラー: 未知のインターフェースモード: {config['interface_mode']}")
-            print("INTERFACE_MODEは 'cli', 'gui', または 'discord' を指定してください")
+            print("INTERFACE_MODEは 'cli', 'gui', 'discord', または 'web' を指定してください")
             sys.exit(1)
         
     except KeyboardInterrupt:
